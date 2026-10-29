@@ -7868,6 +7868,108 @@ __publicField(ActivarJumpscare, "Properties", {
   duracion: Property6.float(1.5)
 });
 
+// js/vr-joystick-movement.js
+import { Component as Component34, Property as Property7 } from "@wonderlandengine/api";
+var VrJoystickMovement = class extends Component34 {
+  _session = null;
+  _forward = new Float32Array(3);
+  _move = new Float32Array(3);
+  start() {
+    this._onSessionStart = (session) => {
+      this._session = session;
+    };
+    this._onSessionEnd = () => {
+      this._session = null;
+    };
+    this.engine.onXRSessionStart.add(this._onSessionStart);
+    this.engine.onXRSessionEnd.add(this._onSessionEnd);
+    if (this.engine.xr) {
+      this._session = this.engine.xr.session;
+    }
+  }
+  update(dt) {
+    if (!this._session || !this.head)
+      return;
+    this.movePlayer(dt);
+    this.turnPlayer(dt);
+  }
+  movePlayer(dt) {
+    const pad = this.getGamepad("left");
+    if (!pad)
+      return;
+    const offset2 = pad.axes.length >= 4 ? 2 : 0;
+    let x = pad.axes[offset2] ?? 0;
+    let y = pad.axes[offset2 + 1] ?? 0;
+    if (Math.abs(x) < this.deadZone)
+      x = 0;
+    if (Math.abs(y) < this.deadZone)
+      y = 0;
+    if (x === 0 && y === 0)
+      return;
+    this.head.getForwardWorld(this._forward);
+    let fx = this._forward[0];
+    let fz = this._forward[2];
+    const length5 = Math.hypot(fx, fz);
+    if (length5 < 1e-4)
+      return;
+    fx /= length5;
+    fz /= length5;
+    this._move[0] = (-fz * x - fx * y) * this.speed * dt;
+    this._move[1] = 0;
+    this._move[2] = (fx * x - fz * y) * this.speed * dt;
+    this.object.translateWorld(this._move);
+  }
+  turnPlayer(dt) {
+    const pad = this.getGamepad("right");
+    if (!pad || !this.head)
+      return;
+    const offset2 = pad.axes.length >= 4 ? 2 : 0;
+    let x = pad.axes[offset2] ?? 0;
+    if (Math.abs(x) < this.turnDeadZone)
+      x = 0;
+    if (x === 0)
+      return;
+    const angle2 = -x * this.turnSpeed * dt;
+    const headPosition = new Float32Array(3);
+    this.head.getPositionWorld(headPosition);
+    this.object.rotateAxisAngleDeg([0, 1, 0], angle2);
+    const newHeadPosition = new Float32Array(3);
+    this.head.getPositionWorld(newHeadPosition);
+    const correction = new Float32Array([
+      headPosition[0] - newHeadPosition[0],
+      0,
+      headPosition[2] - newHeadPosition[2]
+    ]);
+    this.object.translateWorld(correction);
+  }
+  getGamepad(handedness) {
+    if (!this._session)
+      return null;
+    for (const source of this._session.inputSources) {
+      if (source.handedness === handedness && source.gamepad) {
+        return source.gamepad;
+      }
+    }
+    return null;
+  }
+  onDestroy() {
+    this.engine.onXRSessionStart.remove(
+      this._onSessionStart
+    );
+    this.engine.onXRSessionEnd.remove(
+      this._onSessionEnd
+    );
+  }
+};
+__publicField(VrJoystickMovement, "TypeName", "vr-joystick-movement");
+__publicField(VrJoystickMovement, "Properties", {
+  speed: Property7.float(1.5),
+  deadZone: Property7.float(0.15),
+  head: Property7.object(),
+  turnSpeed: Property7.float(100),
+  turnDeadZone: Property7.float(0.15)
+});
+
 // js/index.js
 function js_default(engine) {
   engine.registerComponent(AudioListener);
@@ -7886,6 +7988,7 @@ function js_default(engine) {
   engine.registerComponent(MoverYAudio);
   engine.registerComponent(MovimientoLuz);
   engine.registerComponent(ActivarJumpscare);
+  engine.registerComponent(VrJoystickMovement);
 }
 export {
   js_default as default
